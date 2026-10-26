@@ -11,7 +11,11 @@
   const haptic = () => { try { navigator.vibrate && navigator.vibrate(8); } catch {} };
   const Cap = window.Capacitor;
   const native = !!(Cap && Cap.isNativePlatform && Cap.isNativePlatform());
-  const plugin = (n) => { try { return Cap.registerPlugin(n); } catch { return null; } };
+  const plugin = (n) => {
+    try { if (Cap && Cap.registerPlugin) return Cap.registerPlugin(n); } catch {}
+    return (Cap && Cap.Plugins && Cap.Plugins[n]) || null;
+  };
+  const timeout = (p, ms = 3000) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('Нет ответа от телефона')), ms))]);
   const MODELS = window.BUDS_MODELS || {};
 
   // ---------------------------------------------------------------- mock (проверка в браузере)
@@ -593,17 +597,24 @@
         App.addListener('resume', () => { if (S.st.connected) Buds.refresh(); else if (S.st.address) connect(); });
       }
     } catch {}
+    if (!Buds) { fatal('Не найден модуль Bluetooth приложения. Переустанови приложение.'); return; }
     let rt;
-    Buds.addListener('state', (st) => {
+    try { Buds.addListener('state', (st) => {
       const prev = JSON.stringify(S.st); merge(st);
       if (S.finding && st.connected === false) S.finding = false;
       const busy = $('.sheet.show') || (document.activeElement && document.activeElement.tagName === 'INPUT');
       if ($('#view') && !busy && prev !== JSON.stringify(S.st)) { clearTimeout(rt); rt = setTimeout(() => render(), 60); }
-    });
-    try { merge(await Buds.getState()); } catch {}
+    }); } catch (e) { console.error(e); }
+    try { merge(await timeout(Buds.getState())); } catch (e) { console.error(e); }
     if (!S.st.address) return renderPicker();
     render(true);
     if (!S.st.connected) connect();
   }
-  boot();
+  function fatal(msg) {
+    app.innerHTML = `<div class="screen login" style="justify-content:center;padding:24px"><div class="err" style="white-space:pre-wrap">${esc(msg)}</div>
+      <button class="btn primary" style="margin-top:14px" onclick="location.reload()">Перезапустить</button></div>`;
+  }
+  window.addEventListener('error', (e) => { if (!app.children.length) fatal('Ошибка: ' + (e.message || e)); });
+  window.addEventListener('unhandledrejection', (e) => console.error(e.reason));
+  boot().catch((e) => fatal('Ошибка запуска: ' + (e && e.message || e)));
 })();
