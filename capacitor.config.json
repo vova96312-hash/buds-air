@@ -1,0 +1,7 @@
+{
+  "appId": "com.vova.budsair",
+  "appName": "Buds Air",
+  "webDir": "www",
+  "server": { "androidScheme": "https" },
+  "android": { "backgroundColor": "#05050b" }
+}
