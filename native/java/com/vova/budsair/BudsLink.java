@@ -209,6 +209,58 @@ public final class BudsLink {
         return false;
     }
 
+    // ---------------------------------------------------------------- автоподключение
+
+    static boolean looksLikeBuds(String n) {
+        return n != null && n.toLowerCase(Locale.ROOT).matches(".*(realme|buds|oppo|oneplus|enco).*");
+    }
+
+    /** Подключены ли наушники к телефону по Bluetooth (звук), независимо от нашего канала. */
+    public static boolean isLinked(BluetoothDevice d) {
+        try { Object r = d.getClass().getMethod("isConnected").invoke(d); return Boolean.TRUE.equals(r); }
+        catch (Exception e) { return false; }
+    }
+
+    /** Какие наушники сейчас подключены к телефону: сохранённые, иначе первые похожие на realme. */
+    @SuppressLint("MissingPermission")
+    public String linkedTarget() {
+        BluetoothAdapter a = adapter();
+        if (a == null || !a.isEnabled()) return null;
+        try {
+            Set<BluetoothDevice> set = a.getBondedDevices();
+            if (set == null) return null;
+            if (address != null) for (BluetoothDevice d : set) if (address.equals(d.getAddress()) && isLinked(d)) return address;
+            if (address == null) for (BluetoothDevice d : set) if (isLinked(d) && looksLikeBuds(d.getName())) return d.getAddress();
+        } catch (SecurityException ignored) {}
+        return null;
+    }
+
+    private volatile boolean autoBusy;
+
+    /** Подключиться в фоне, если наушники уже соединены с телефоном. Несколько попыток: профили поднимаются не сразу. */
+    public void autoConnect(final String hint, final long delayMs) {
+        if (connected || connecting || autoBusy) return;
+        autoBusy = true;
+        new Thread(() -> {
+            try {
+                if (delayMs > 0) Thread.sleep(delayMs);
+                for (int i = 0; i < 4 && !connected; i++) {
+                    String target = hint != null && (address == null || hint.equals(address)) ? hint : linkedTarget();
+                    if (target == null) break;
+                    note("auto connect " + target + " #" + (i + 1));
+                    if (connectBlocking(target)) break;
+                    Thread.sleep(2500L * (i + 1));
+                }
+            } catch (InterruptedException ignored) {
+            } finally { autoBusy = false; }
+        }, "buds-auto").start();
+    }
+
+    /** Телефон потерял наушники — сразу показываем это, не дожидаясь обрыва канала. */
+    public void onLinkLost(String addr) {
+        if (addr != null && addr.equals(address)) { closeSocket(); error = null; changed(); }
+    }
+
     public void disconnect() { closeSocket(); changed(); }
 
     private void closeSocket() {

@@ -32,6 +32,13 @@ comps = """
             </intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/buds_widget_info" />
         </receiver>
+        <receiver android:name=".BudsAutoConnect" android:exported="true">
+            <intent-filter>
+                <action android:name="android.bluetooth.device.action.ACL_CONNECTED" />
+                <action android:name="android.bluetooth.device.action.ACL_DISCONNECTED" />
+                <action android:name="android.bluetooth.adapter.action.STATE_CHANGED" />
+            </intent-filter>
+        </receiver>
         <service android:name=".BudsTile" android:exported="true" android:label="Наушники"
             android:icon="@drawable/ic_buds_tile"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">

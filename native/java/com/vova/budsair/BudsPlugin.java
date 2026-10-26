@@ -36,6 +36,7 @@ public class BudsPlugin extends Plugin {
     public void load() {
         link = BudsLink.get(getContext());
         link.addListener(listener);
+        if (hasBt()) link.autoConnect(null, 300);
     }
 
     @Override
@@ -66,6 +67,7 @@ public class BudsPlugin extends Plugin {
                 JSObject o = new JSObject();
                 o.put("name", d.getName() == null ? d.getAddress() : d.getName());
                 o.put("address", d.getAddress());
+                o.put("connected", BudsLink.isLinked(d));
                 arr.put(o);
             }
         } catch (SecurityException e) { call.reject("Нет разрешения Bluetooth", "NO_PERMISSION"); return; }
@@ -82,6 +84,17 @@ public class BudsPlugin extends Plugin {
             if (link.connectBlocking(addr)) call.resolve(stateJson());
             else call.reject(link.error == null ? "Не удалось подключиться" : link.error);
         }, "buds-plugin-connect").start();
+    }
+
+    /** Подключиться, если наушники уже соединены с телефоном. Возвращает адрес найденных наушников. */
+    @PluginMethod
+    public void autoConnect(PluginCall call) {
+        JSObject r = new JSObject();
+        if (!hasBt()) { r.put("address", null); call.resolve(r); return; }
+        String t = link.linkedTarget();
+        r.put("address", t);
+        if (t != null) link.autoConnect(t, 0);
+        call.resolve(r);
     }
 
     @PluginMethod public void disconnect(PluginCall call) { link.disconnect(); call.resolve(); }

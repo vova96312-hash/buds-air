@@ -29,7 +29,8 @@
     return {
       addListener: (e, f) => { ls.push(f); return { remove() {} }; },
       ensurePermission: async () => ({ granted: true }),
-      getBonded: async () => ({ devices: [{ name: 'realme Buds Air8', address: 'AA:BB:CC:DD:EE:FF' }, { name: 'JBL Flip 6', address: '11:22:33:44:55:66' }] }),
+      getBonded: async () => ({ devices: [{ name: 'realme Buds Air8', address: 'AA:BB:CC:DD:EE:FF', connected: true }, { name: 'JBL Flip 6', address: '11:22:33:44:55:66' }] }),
+      autoConnect: async () => ({ address: null }),
       connect: async ({ address }) => { st.connecting = true; emit(); await later(() => {
         Object.assign(st, { connecting: false, connected: true, address, name: 'realme Buds Air8', productId: '066812', firmware: '1.0.3.8',
           features: { 4: 1, 6: 0, 9: 0, 17: 1, 24: 0, 26: 1, 27: 0, 29: 1 }, commands: [0x0405, 0x0406, 0x0427, 0x0112, 0x0418],
@@ -547,10 +548,10 @@
         const perm = await Buds.ensurePermission();
         if (!perm.granted) { box.innerHTML = `<div class="err">Без разрешения «Устройства поблизости» приложение не видит наушники.</div><button class="btn primary" id="perm">Разрешить</button>`; $('#perm').onclick = load; return; }
         const { devices } = await Buds.getBonded();
-        const score = (d) => (/realme|buds|oppo|oneplus|enco/i.test(d.name) ? 0 : 1);
+        const score = (d) => (d.connected ? 0 : /realme|buds|oppo|oneplus|enco/i.test(d.name) ? 1 : 2);
         devices.sort((a, b) => score(a) - score(b) || a.name.localeCompare(b.name));
-        box.innerHTML = devices.length ? devices.map((d) => `<button class="card dev ${score(d) === 0 ? 'star' : ''}" data-addr="${esc(d.address)}" data-name="${esc(d.name)}">
-            <span class="ic">${I.head}</span><div style="flex:1;min-width:0"><div class="n">${esc(d.name)}</div><div class="a">${esc(d.address)}</div></div>${I.chev}</button>`).join('')
+        box.innerHTML = devices.length ? devices.map((d) => `<button class="card dev ${score(d) < 2 ? 'star' : ''}" data-addr="${esc(d.address)}" data-name="${esc(d.name)}">
+            <span class="ic">${I.head}</span><div style="flex:1;min-width:0"><div class="n">${esc(d.name)}</div><div class="a">${d.connected ? '<span style="color:var(--green)">● подключены к телефону</span>' : esc(d.address)}</div></div>${I.chev}</button>`).join('')
           : '<div class="empty">Нет сопряжённых устройств</div>';
         $$('[data-addr]', box).forEach((b) => b.onclick = async () => {
           haptic();
@@ -594,7 +595,7 @@
       const App = native ? plugin('App') : null;
       if (App) {
         App.addListener('backButton', () => { if (overlayStack.length) overlayStack[overlayStack.length - 1](); else if (S.tab !== 'home') { S.tab = 'home'; render(true); } else App.exitApp(); });
-        App.addListener('resume', () => { if (S.st.connected) Buds.refresh(); else if (S.st.address) connect(); });
+        App.addListener('resume', () => { if (S.st.connected) Buds.refresh(); else autoFind(); });
       }
     } catch {}
     if (!Buds) { fatal('Не найден модуль Bluetooth приложения. Переустанови приложение.'); return; }
@@ -606,10 +607,30 @@
       if ($('#view') && !busy && prev !== JSON.stringify(S.st)) { clearTimeout(rt); rt = setTimeout(() => render(), 60); }
     }); } catch (e) { console.error(e); }
     try { merge(await timeout(Buds.getState())); } catch (e) { console.error(e); }
-    if (!S.st.address) return renderPicker();
+    if (!S.st.address && !store.get('address')) {
+      const found = await autoFind();
+      if (!found) return renderPicker();
+    }
     render(true);
-    if (!S.st.connected) connect();
+    if (!S.st.connected && !S.st.connecting) autoFind();
+    // пока приложение открыто — раз в 5 секунд проверяем, не подключились ли наушники к телефону
+    setInterval(() => { if (!document.hidden && !S.st.connected && !S.st.connecting) autoFind(); }, 5000);
   }
+  /** Ищет наушники, которые уже подключены к телефону, и сам подключается к ним. */
+  let finding = false;
+  async function autoFind() {
+    if (finding || !Buds || !Buds.autoConnect) return null;
+    finding = true;
+    try {
+      const { address } = await timeout(Buds.autoConnect(), 4000);
+      if (address) {
+        if (!store.get('address')) { store.set('address', address); S.st.address = address; }
+        if (!$('.nav')) { S.tab = 'home'; app.innerHTML = ''; render(true); }
+      }
+      return address || null;
+    } catch { return null; } finally { finding = false; }
+  }
+
   function fatal(msg) {
     app.innerHTML = `<div class="screen login" style="justify-content:center;padding:24px"><div class="err" style="white-space:pre-wrap">${esc(msg)}</div>
       <button class="btn primary" style="margin-top:14px" onclick="location.reload()">Перезапустить</button></div>`;
