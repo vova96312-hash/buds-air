@@ -194,7 +194,6 @@ public class BudsPlugin extends Plugin {
 
     @PluginMethod
     public void testIsland(PluginCall call) {
-        if (!BudsIsland.canDraw(getContext())) { call.reject("Нет разрешения «Поверх других приложений»", "NO_OVERLAY"); return; }
         link.previewIsland();
         call.resolve();
     }

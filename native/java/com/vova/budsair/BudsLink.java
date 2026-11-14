@@ -151,16 +151,20 @@ public final class BudsLink {
         boolean now = connected;
         if (now && !wasConnected) {
             connectedAt = System.currentTimeMillis();
-            islandPending = BudsIsland.enabled(ctx);
+            islandPending = true;
             main.removeCallbacks(islandFire);
             if (islandPending) main.postDelayed(islandFire, 3000);
         } else if (!now && wasConnected) {
             islandPending = false;
             main.removeCallbacks(islandFire);
+            BudsLive.cancel(ctx);
         } else if (now && islandPending && System.currentTimeMillis() - connectedAt > 1700
                 && (batteryLeft >= 0 || batteryRight >= 0)) {
             main.removeCallbacks(islandFire);
             main.post(islandFire);
+        }
+        else if (now && !islandPending && System.currentTimeMillis() < liveUntil) {
+            BudsLive.post(ctx, this);                              // заряд обновился — обновим и капсулу
         }
         wasConnected = now;
     }
@@ -168,13 +172,21 @@ public final class BudsLink {
     private void fireIsland() {
         if (!islandPending || !connected) return;
         islandPending = false;
-        BudsIsland is = BudsIsland.get(ctx);
-        is.setData(this);
-        is.showConnected();
+        liveUntil = System.currentTimeMillis() + 9000;
+        BudsLive.post(ctx, this);                                  // системная капсула Android 16 (realme Live Alerts)
+        if (BudsIsland.enabled(ctx)) {                             // своя анимация поверх экрана
+            BudsIsland is = BudsIsland.get(ctx);
+            is.setData(this);
+            is.showConnected();
+        }
     }
+
+    private volatile long liveUntil;
 
     /** Показать капсулу сейчас (кнопка «Показать пример»). */
     public void previewIsland() {
+        liveUntil = System.currentTimeMillis() + 9000;
+        BudsLive.post(ctx, this);
         BudsIsland is = BudsIsland.get(ctx);
         is.setData(this);
         is.showConnected();

@@ -26,6 +26,7 @@ perms = """
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
 """
 if "BLUETOOTH_CONNECT" not in mf:
     mf = mf.replace("<application", perms + "\n    <application", 1)

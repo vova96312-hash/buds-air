@@ -416,10 +416,10 @@
         </div>
       </div>
       <div class="card"><div class="card-title">Dynamic Island</div>
-        <div class="gest-row"><span>Показывать при подключении</span><label class="switch" data-island><input type="checkbox" ${S.island && S.island.enabled ? 'checked' : ''}><i></i></label></div>
-        ${S.island && !S.island.canDraw ? `<div class="note" style="margin:8px 0 10px">Нужно разрешение <b>«Поверх других приложений»</b>, иначе капсула не появится.</div>
-        <button class="btn primary sm" data-island-perm>Разрешить</button>` : `<div class="note" style="margin:8px 0 10px">Как на iPhone: при подключении наушников из камеры выезжает капсула с зарядом L / R / кейса. Нажми на неё, чтобы открыть приложение.</div>
-        <button class="btn sm" data-island-test>Показать пример</button>`}
+        <div class="note" style="margin-bottom:10px">При подключении наушников телефон покажет заряд в капсуле у камеры (Live Alerts в realme UI 7, Android 16). Если капсула не появляется: Настройки → Уведомления → Buds Air → включи «Live Alerts» / «Живые обновления».</div>
+        <div class="gest-row"><span>Своя анимация из камеры</span><label class="switch" data-island><input type="checkbox" ${S.island && S.island.enabled ? 'checked' : ''}><i></i></label></div>
+        ${S.island && S.island.enabled && !S.island.canDraw ? `<div class="note" style="margin:8px 0 10px">Для своей анимации нужно разрешение <b>«Поверх других приложений»</b>.</div>
+        <button class="btn primary sm" data-island-perm>Разрешить</button> ` : ''}<button class="btn sm" data-island-test style="margin-top:10px">Показать пример</button>
       </div>
       <div class="card"><div class="card-title">Последнее подключение</div>
         <div class="gest-row"><span>Был в сети</span><span class="v">${lastSeenTxt}</span></div>
