@@ -699,6 +699,7 @@
     }); } catch (e) { console.error(e); }
     try { merge(await timeout(Buds.getState())); } catch (e) { console.error(e); }
     loadIsland();
+    if (Buds.ensureNotif) setTimeout(() => Buds.ensureNotif().catch(() => {}), 1500);
     if (!S.st.address && !store.get('address')) {
       const found = await autoFind();
       if (!found) return renderPicker();

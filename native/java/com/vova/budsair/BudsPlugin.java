@@ -29,7 +29,10 @@ import java.util.Set;
 
 @CapacitorPlugin(
     name = "Buds",
-    permissions = { @Permission(alias = "bt", strings = { Manifest.permission.BLUETOOTH_CONNECT }) }
+    permissions = {
+        @Permission(alias = "bt", strings = { Manifest.permission.BLUETOOTH_CONNECT }),
+        @Permission(alias = "notif", strings = { Manifest.permission.POST_NOTIFICATIONS })
+    }
 )
 public class BudsPlugin extends Plugin {
     private BudsLink link;
@@ -55,6 +58,18 @@ public class BudsPlugin extends Plugin {
 
     @PermissionCallback
     private void permCallback(PluginCall call) { JSObject r = new JSObject(); r.put("granted", hasBt()); call.resolve(r); }
+
+    private boolean hasNotif() { return Build.VERSION.SDK_INT < 33 || getPermissionState("notif") == PermissionState.GRANTED; }
+
+    /** Android 13+: без этого разрешения уведомление в шторке не показывается. */
+    @PluginMethod
+    public void ensureNotif(PluginCall call) {
+        if (hasNotif()) { JSObject r = new JSObject(); r.put("granted", true); call.resolve(r); return; }
+        requestPermissionForAlias("notif", call, "notifCallback");
+    }
+
+    @PermissionCallback
+    private void notifCallback(PluginCall call) { JSObject r = new JSObject(); r.put("granted", hasNotif()); call.resolve(r); }
 
     @SuppressLint("MissingPermission")
     @PluginMethod
