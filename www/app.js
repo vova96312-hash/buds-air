@@ -416,7 +416,7 @@
         </div>
       </div>
       <div class="card"><div class="card-title">Dynamic Island</div>
-        <div class="note" style="margin-bottom:10px">При подключении наушников телефон покажет заряд в капсуле у камеры (Live Alerts в realme UI 7, Android 16). Если капсула не появляется: Настройки → Уведомления → Buds Air → включи «Live Alerts» / «Живые обновления».</div>
+        <div class="note" style="margin-bottom:10px">При подключении наушников телефон покажет заряд в капсуле у камеры — через «Живые оповещения» realme UI 7. Если капсула не появляется: Настройки → Уведомления → Buds Air → включи «Живые оповещения».</div>
         <div class="gest-row"><span>Своя анимация из камеры</span><label class="switch" data-island><input type="checkbox" ${S.island && S.island.enabled ? 'checked' : ''}><i></i></label></div>
         ${S.island && S.island.enabled && !S.island.canDraw ? `<div class="note" style="margin:8px 0 10px">Для своей анимации нужно разрешение <b>«Поверх других приложений»</b>.</div>
         <button class="btn primary sm" data-island-perm>Разрешить</button> ` : ''}<button class="btn sm" data-island-test style="margin-top:10px">Показать пример</button>
