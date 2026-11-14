@@ -6,7 +6,9 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothSocket;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.ParcelUuid;
@@ -120,12 +122,70 @@ public final class BudsLink {
     public void removeListener(Listener l) { listeners.remove(l); }
 
     void changed() {
-        prefs().edit().putInt("bl", batteryLeft).putInt("br", batteryRight).putInt("bc", batteryCase)
-                .putInt("anc", ancMode).putInt("ancLevel", ancLevel).putString("product", productId).apply();
+        SharedPreferences.Editor ed = prefs().edit();
+        ed.putInt("bl", batteryLeft).putInt("br", batteryRight).putInt("bc", batteryCase)
+                .putInt("anc", ancMode).putInt("ancLevel", ancLevel).putString("product", productId);
+        
+        if (!connected) {
+            ed.putLong("last_seen", System.currentTimeMillis());
+        }
+        ed.apply();
+        island();
+
         main.post(() -> {
             for (Listener l : listeners) { try { l.onChanged(); } catch (Exception ignored) {} }
             BudsWidget.updateAll(ctx);
         });
+    }
+
+    // ---------------------------------------------------------------- Dynamic Island
+
+    private volatile boolean wasConnected, islandPending;
+    private volatile long connectedAt;
+    private final Runnable islandFire = this::fireIsland;
+
+    /** Показ капсулы один раз на подключение — когда пришёл свежий заряд (или через 3 с). */
+    private void island() {
+        BudsIsland is = BudsIsland.get(ctx);
+        is.setData(this);
+        boolean now = connected;
+        if (now && !wasConnected) {
+            connectedAt = System.currentTimeMillis();
+            islandPending = BudsIsland.enabled(ctx);
+            main.removeCallbacks(islandFire);
+            if (islandPending) main.postDelayed(islandFire, 3000);
+        } else if (!now && wasConnected) {
+            islandPending = false;
+            main.removeCallbacks(islandFire);
+        } else if (now && islandPending && System.currentTimeMillis() - connectedAt > 1700
+                && (batteryLeft >= 0 || batteryRight >= 0)) {
+            main.removeCallbacks(islandFire);
+            main.post(islandFire);
+        }
+        wasConnected = now;
+    }
+
+    private void fireIsland() {
+        if (!islandPending || !connected) return;
+        islandPending = false;
+        BudsIsland is = BudsIsland.get(ctx);
+        is.setData(this);
+        is.showConnected();
+    }
+
+    /** Показать капсулу сейчас (кнопка «Показать пример»). */
+    public void previewIsland() {
+        BudsIsland is = BudsIsland.get(ctx);
+        is.setData(this);
+        is.showConnected();
+    }
+
+    private void startService() {
+        try {
+            Intent intent = new Intent(ctx, BudsService.class);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ctx.startForegroundService(intent);
+            else ctx.startService(intent);
+        } catch (Exception e) { note("service start fail: " + e.getMessage()); }
     }
 
     void note(String s) {
@@ -155,6 +215,7 @@ public final class BudsLink {
     private boolean connectLocked(String addr) {
         if (connected && socket != null && addr != null && addr.equals(address)) return true;
         closeSocket();
+        startService();
         BluetoothAdapter a = adapter();
         if (a == null || !a.isEnabled()) { error = "Bluetooth выключен"; changed(); return false; }
         if (addr == null) { error = "Наушники не выбраны"; changed(); return false; }

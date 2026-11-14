@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_gravity="center_horizontal">
+
+    <LinearLayout
+        android:id="@+id/island_root"
+        android:layout_width="wrap_content"
+        android:layout_height="40dp"
+        android:minWidth="120dp"
+        android:background="@drawable/island_bg"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:elevation="4dp">
+
+        <ImageView
+            android:id="@+id/island_icon"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:src="@drawable/ic_buds_tile"
+            android:tint="#FFFFFF" />
+
+        <LinearLayout
+            android:id="@+id/island_content"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginStart="10dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/island_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Buds Air"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:maxLines="1"
+                android:ellipsize="end" />
+
+            <TextView
+                android:id="@+id/island_sub"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="100% · 100%"
+                android:textColor="#BBBBBB"
+                android:textSize="11sp"
+                android:maxLines="1" />
+        </LinearLayout>
+    </LinearLayout>
+</FrameLayout>

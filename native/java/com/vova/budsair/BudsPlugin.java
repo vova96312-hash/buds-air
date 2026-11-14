@@ -4,7 +4,10 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Build;
+import android.provider.Settings;
 
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
@@ -142,6 +145,44 @@ public class BudsPlugin extends Plugin {
     public void getLog(PluginCall call) { JSObject r = new JSObject(); r.put("lines", new JSONArray(link.getLog())); call.resolve(r); }
 
     @PluginMethod public void updateWidget(PluginCall call) { BudsWidget.updateAll(getContext()); call.resolve(); }
+
+    // ---- Dynamic Island
+    private JSObject islandJson() {
+        JSObject r = new JSObject();
+        r.put("enabled", BudsIsland.enabled(getContext()));
+        r.put("canDraw", BudsIsland.canDraw(getContext()));
+        return r;
+    }
+
+    @PluginMethod public void islandStatus(PluginCall call) { call.resolve(islandJson()); }
+
+    @PluginMethod
+    public void setIsland(PluginCall call) {
+        boolean on = Boolean.TRUE.equals(call.getBoolean("on", true));
+        link.prefs().edit().putBoolean(BudsIsland.PREF_ON, on).apply();
+        if (!on) BudsIsland.get(getContext()).hideNow();
+        call.resolve(islandJson());
+    }
+
+    /** Открывает системный экран «Поверх других приложений» для этого приложения. */
+    @PluginMethod
+    public void requestOverlay(PluginCall call) {
+        if (Build.VERSION.SDK_INT >= 23 && !BudsIsland.canDraw(getContext())) {
+            try {
+                Intent i = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getContext().getPackageName()));
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                getContext().startActivity(i);
+            } catch (Exception e) { call.reject("Не удалось открыть настройки"); return; }
+        }
+        call.resolve(islandJson());
+    }
+
+    @PluginMethod
+    public void testIsland(PluginCall call) {
+        if (!BudsIsland.canDraw(getContext())) { call.reject("Нет разрешения «Поверх других приложений»", "NO_OVERLAY"); return; }
+        link.previewIsland();
+        call.resolve();
+    }
 
     private JSObject stateJson() {
         JSObject o = new JSObject();

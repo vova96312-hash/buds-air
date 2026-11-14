@@ -22,6 +22,9 @@ perms = """
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 """
 if "BLUETOOTH_CONNECT" not in mf:
     mf = mf.replace("<application", perms + "\n    <application", 1)
@@ -46,6 +49,8 @@ comps = """
                 <action android:name="android.service.quicksettings.action.QS_TILE" />
             </intent-filter>
         </service>
+        <service android:name=".BudsService" android:exported="false" 
+            android:foregroundServiceType="connectedDevice" />
 """
 if "BudsWidget" not in mf:
     mf = mf.replace("</application>", comps + "    </application>", 1)

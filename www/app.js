@@ -91,7 +91,8 @@
   };
 
   // ---------------------------------------------------------------- модель
-  const S = { st: {}, tab: 'home', side: 1, eq: store.get('eq', [0, 0, 0, 0, 0, 0]), finding: false, noise: null };
+  const S = { st: {}, tab: 'home', side: 1, eq: store.get('eq', [0, 0, 0, 0, 0, 0]), finding: false, noise: null,
+    perf: store.get('perf', true), theme: store.get('theme', 'midnight'), island: null };
   const model = () => MODELS[(S.st.productId || store.get('product') || '').toUpperCase()] || null;
   const feat = (id) => (S.st.features || {})[id];
   const hasFeat = (id) => feat(id) !== undefined;
@@ -197,7 +198,13 @@
 
   // ---------------------------------------------------------------- render
   const app = $('#app');
+  function applyTheme() {
+    document.body.dataset.theme = S.theme;
+    document.body.classList.toggle('no-anim', !S.perf);
+  }
+
   function render(anim = false) {
+    applyTheme();
     if (!S.st.address && !store.get('address')) return renderPicker();
     if (!$('.nav')) {
       app.innerHTML = `<div class="screen"><div class="scroll" id="view"></div></div>
@@ -209,9 +216,19 @@
         </nav>`;
       $$('.nav [data-tab]').forEach((b) => b.onclick = () => { haptic(); S.tab = b.dataset.tab; render(true); });
       anim = true;
+      initPullToRefresh();
     }
-    $$('.nav [data-tab]').forEach((b) => b.classList.toggle('on', b.dataset.tab === S.tab));
+    
+    // Пытаемся обновить только значения, если вкладка не сменилась
     const v = $('#view');
+    const existing = v.dataset.tab;
+    if (existing === S.tab && !anim) {
+        updateSurgical(v);
+        return;
+    }
+    v.dataset.tab = S.tab;
+
+    $$('.nav [data-tab]').forEach((b) => b.classList.toggle('on', b.dataset.tab === S.tab));
     const html = { home: vHome, sound: vSound, gest: vGest, more: vMore }[S.tab]();
     const keep = v.scrollTop;
     v.innerHTML = `<div>${html}</div>`;
@@ -219,6 +236,55 @@
     else v.scrollTop = keep;
     moveLens(anim);
     bind(v);
+  }
+
+  function updateSurgical(v) {
+    const st = S.st;
+    // Обновляем батарейки
+    const ringVal = (id, v, ok, charging) => {
+        const el = $(`.bat:nth-child(${id === 'l' ? 1 : id === 'r' ? 2 : 3})`, v);
+        if (!el) return;
+        el.classList.toggle('na', !ok);
+        $('b', el).textContent = ok ? v + '%' : '—';
+        const r = 29, c = 2 * Math.PI * r, pct = ok ? v : 0;
+        $('.val', el).style.strokeDashoffset = c * (1 - pct / 100);
+        const bolt = $('.bolt', el);
+        if (charging && ok && !bolt) {
+            $('.lbl', el).insertAdjacentHTML('afterbegin', `<span class="bolt">${I.bolt}</span>`);
+        } else if ((!charging || !ok) && bolt) {
+            bolt.remove();
+        }
+    };
+    if (S.tab === 'home') {
+        ringVal('l', st.batteryLeft, st.batteryLeft >= 0, st.chargingLeft);
+        ringVal('r', st.batteryRight, st.batteryRight >= 0, st.chargingRight);
+        ringVal('c', st.batteryCase, st.batteryCase >= 0, st.chargingCase);
+        
+        const status = $('.status-pill', v) || $('.pill.bad', v) || $('.pill.warn', v);
+        if (status) status.outerHTML = statusPill();
+    }
+  }
+
+  function initPullToRefresh() {
+    const v = $('#view');
+    let y0 = 0, dist = 0;
+    v.addEventListener('touchstart', (e) => { if (v.scrollTop <= 0) y0 = e.touches[0].clientY; else y0 = -1; }, { passive: true });
+    v.addEventListener('touchmove', (e) => {
+        if (y0 === -1) return;
+        dist = e.touches[0].clientY - y0;
+        if (dist > 0) {
+            v.style.transform = `translateY(${Math.min(dist / 2, 60)}px)`;
+            if (dist > 120) haptic();
+        }
+    }, { passive: true });
+    v.addEventListener('touchend', async () => {
+        if (y0 === -1) return;
+        v.style.transition = 'transform 0.3s ease';
+        v.style.transform = '';
+        if (dist > 120) { haptic(); if (S.st.connected) await Buds.refresh(); else await connect(); }
+        setTimeout(() => v.style.transition = '', 300);
+        y0 = -1; dist = 0;
+    });
   }
   function moveLens(anim) {
     const nav = $('.nav'), lens = $('.nav .lens'), b = $(`.nav [data-tab="${S.tab}"]`);
@@ -338,8 +404,27 @@
   function vMore() {
     const st = S.st;
     const m = model();
+    const lastSeen = store.get('last_seen');
+    const lastSeenTxt = lastSeen ? new Date(lastSeen).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'нет данных';
     const fitTxt = (r) => ({ good: '<span style="color:var(--green)">Отлично</span>', average: '<span style="color:var(--amber)">Нормально</span>', poor: '<span style="color:var(--red)">Плохо</span>', error: 'Ошибка' }[r] || '—');
     return `${topbar('Ещё')}
+      <div class="card"><div class="card-title">Персонализация</div>
+        <div class="gest-row"><span>Анимация фона</span><label class="switch" data-perf><input type="checkbox" ${S.perf ? 'checked' : ''}><i></i></label></div>
+        <div class="section" style="padding-left:0;margin-top:12px">Тема оформления</div>
+        <div class="seg" style="margin-top:8px">
+          ${[['midnight', 'Midnight'], ['sunset', 'Sunset'], ['emerald', 'Emerald']].map(([k, n]) => `<button data-theme-set="${k}" class="${S.theme === k ? 'on' : ''}">${n}</button>`).join('')}
+        </div>
+      </div>
+      <div class="card"><div class="card-title">Dynamic Island</div>
+        <div class="gest-row"><span>Показывать при подключении</span><label class="switch" data-island><input type="checkbox" ${S.island && S.island.enabled ? 'checked' : ''}><i></i></label></div>
+        ${S.island && !S.island.canDraw ? `<div class="note" style="margin:8px 0 10px">Нужно разрешение <b>«Поверх других приложений»</b>, иначе капсула не появится.</div>
+        <button class="btn primary sm" data-island-perm>Разрешить</button>` : `<div class="note" style="margin:8px 0 10px">Как на iPhone: при подключении наушников из камеры выезжает капсула с зарядом L / R / кейса. Нажми на неё, чтобы открыть приложение.</div>
+        <button class="btn sm" data-island-test>Показать пример</button>`}
+      </div>
+      <div class="card"><div class="card-title">Последнее подключение</div>
+        <div class="gest-row"><span>Был в сети</span><span class="v">${lastSeenTxt}</span></div>
+        <div class="note">Приложение запоминает время последнего контакта. В будущем здесь появится точка на карте.</div>
+      </div>
       ${hasCmd(0x0405) ? `<div class="card"><div class="card-title">Проверка посадки</div>
         <div class="note" style="margin-bottom:12px">Вставь оба наушника и не двигайся ~10 секунд. Наушники проиграют тестовый звук и проверят, подходят ли амбушюры.</div>
         <div class="grid" style="margin-bottom:12px"><div class="kv-glass card stat" style="padding:12px"><div class="k">Левый</div><div class="v" style="font-size:17px">${fitTxt(st.fitLeft)}</div></div>
@@ -476,6 +561,12 @@
         }
       } catch (err) { toast(err.message || String(err), true); }
     };
+    const isl = $('[data-island] input', v);
+    if (isl) isl.onchange = async () => { haptic(); try { S.island = await Buds.setIsland({ on: isl.checked }); render(); } catch (e) { toast(e.message, true); } };
+    const ip = $('[data-island-perm]', v);
+    if (ip) ip.onclick = async () => { haptic(); try { await Buds.requestOverlay(); } catch (e) { toast(e.message, true); } };
+    const it = $('[data-island-test]', v);
+    if (it) it.onclick = async () => { haptic(); try { await Buds.testIsland(); } catch (e) { toast(e.message, true); } };
     const av = $('#alertVol', v);
     if (av) av.onchange = async () => { haptic(); try { await Buds.setAlertVolume({ level: +av.value }); } catch (e) { toast(e.message, true); } };
     $$('.track', v).forEach((tr) => {
@@ -595,7 +686,7 @@
       const App = native ? plugin('App') : null;
       if (App) {
         App.addListener('backButton', () => { if (overlayStack.length) overlayStack[overlayStack.length - 1](); else if (S.tab !== 'home') { S.tab = 'home'; render(true); } else App.exitApp(); });
-        App.addListener('resume', () => { if (S.st.connected) Buds.refresh(); else autoFind(); });
+        App.addListener('resume', () => { if (S.st.connected) Buds.refresh(); else autoFind(); loadIsland(); });
       }
     } catch {}
     if (!Buds) { fatal('Не найден модуль Bluetooth приложения. Переустанови приложение.'); return; }
@@ -607,6 +698,7 @@
       if ($('#view') && !busy && prev !== JSON.stringify(S.st)) { clearTimeout(rt); rt = setTimeout(() => render(), 60); }
     }); } catch (e) { console.error(e); }
     try { merge(await timeout(Buds.getState())); } catch (e) { console.error(e); }
+    loadIsland();
     if (!S.st.address && !store.get('address')) {
       const found = await autoFind();
       if (!found) return renderPicker();
@@ -615,6 +707,10 @@
     if (!S.st.connected && !S.st.connecting) autoFind();
     // пока приложение открыто — раз в 5 секунд проверяем, не подключились ли наушники к телефону
     setInterval(() => { if (!document.hidden && !S.st.connected && !S.st.connecting) autoFind(); }, 5000);
+  }
+  async function loadIsland() {
+    if (!Buds || !Buds.islandStatus) return;
+    try { const r = await timeout(Buds.islandStatus()); const ch = JSON.stringify(r) !== JSON.stringify(S.island); S.island = r; if (ch && S.tab === 'more' && $('#view')) render(); } catch {}
   }
   /** Ищет наушники, которые уже подключены к телефону, и сам подключается к ним. */
   let finding = false;
